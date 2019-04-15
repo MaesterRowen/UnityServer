@@ -3,7 +3,7 @@
 LiNKv2 Server port to Typescript
 
 To Install:
-<npm install>
+`<npm install>`
 
 To Run:
-<npm start>
+`<npm start>`
