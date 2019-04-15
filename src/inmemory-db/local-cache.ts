@@ -1,9 +1,23 @@
 import { Database } from '../database';
-import { Constants, Util } from '../shared';
+import { Constants, Util, HashMap } from '../shared';
 import { MysqlError, PoolConnection } from 'mysql'
 import { Observable, Observer, forkJoin } from 'rxjs';
 import { connect } from 'tls';
 import { isDeepStrictEqual } from 'util';
+
+export interface ILinkRoom {
+    Id: number;                // The ID of the room
+    ParentId: number;           // The Parent ID of the room
+    Name: string;              // The name of the room [limited to 64 chars]
+    TitleId: number;           // The TitleID that the room is available for
+    TUVersion: number;         // The TUVersion that the room is visible for [Public Rooms are visible for all TU Versions]
+    Flags: number;             // Flags for the room
+    OwnerId: number;           // The ID of the room's owner
+    LeaderId: number;          // The ID of the room's leader
+    GameRoom: boolean;         // Set's whether the room is intended to have users 
+    Passcode: number;          // Passcode for the room.  If set, then the room is private; otherwise, it is public
+    CreationTime: number;      // The date and time the room was created
+}
 
 export interface ILobbyInfo {
     Id: number;
@@ -48,6 +62,9 @@ export interface IGameInfo {
 }
 
 export class LocalCache {
+
+    static GameMap: HashMap<number, IGameInfo> = new HashMap();
+
     static LobbyList: ILobbyInfo[] = [];
     static GameList: IGameInfo[] = [];
     static TUList: ITitleUpdate[] = [];
@@ -155,9 +172,18 @@ export class LocalCache {
                                     "Type": type,
                                     "TUVersions": tuVersions
                                 });
+
+                                // Push this item into our map
+                                LocalCache.GameMap.set(titleId, {
+                                    "Name": results[x].Name,
+                                    "TitleId": titleId,
+                                    "LinkEnabled": results[x].LinkEnabled == 1 ? true : false,
+                                    "Type": type,
+                                    "TUVersions": tuVersions
+                                });
                             }
 
-                            Util.Log("Cached " + LocalCache.GameList.length + " game titles and " + tuCount + " title updates versions");
+                            Util.Log("Cached " + LocalCache.GameMap.count() + " game titles and " + tuCount + " title updates versions");
                             observer.next();
                         }
 

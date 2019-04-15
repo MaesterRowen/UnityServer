@@ -7,7 +7,7 @@ export class Constants {
     static readonly LINK_VERSION: number = 1;
 
     static readonly SERVER_MAXCONN: number = 500;
-    static readonly SERVER_PORT: number = 12345;
+    static readonly SERVER_PORT: number = 12346;
 
     // Traffic flow and Encryption status
     static readonly CLIENT_DECRYPTED: number = 0;

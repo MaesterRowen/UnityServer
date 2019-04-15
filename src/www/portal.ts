@@ -1,6 +1,8 @@
-import * as express from 'express';
-import * as expressStatic from 'express-static';
-import * as bodyParser from 'body-parser'
+//import * as express from 'express';
+import express from 'express';
+import expressStatic from 'express-static';
+import bodyParser from 'body-parser';
+
 //import * as cookieParser from 'cookie-parser';
 import { Express, Request, Response } from 'express';
 import { Client } from '../../src/client';
@@ -26,7 +28,9 @@ export class WebServer {
     }
 
     requestGames(request: Request, response: Response) {
-        response.end(JSON.stringify(LocalCache.GameList, null, 2));
+
+
+        response.end(JSON.stringify(LocalCache.GameMap, null, 2));
     }
 
     resp1(request: Request, response: Response) {
@@ -52,6 +56,6 @@ export class WebServer {
             }
         }
 
-        this.adminServer.listen(3000);
+        this.adminServer.listen(3001);
     }
 }

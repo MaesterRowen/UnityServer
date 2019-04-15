@@ -5,7 +5,6 @@ import { WebServer } from './www/portal';
 let web: WebServer = new WebServer();
 web.StartServer();
 
-
 // Main entry point and starting point for the application
 let server: Server = new Server();
 
