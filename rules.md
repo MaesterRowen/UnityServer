@@ -1,13 +1,11 @@
-
-
-
-
-Persistant Rooms
+#Persistant Rooms
  - Public Game Room 
  
-Single Session Rooms 
+#Single Session Rooms 
  - Public Game Room 
  - Private Game Room 
+
+
 
 
 Single Session Rooms are created and stored in memory.  
@@ -25,7 +23,10 @@ If player B is blocked by Player A, then Player B cannot see rooms created by Pl
  - Moderators can temporarily system ban any player that is lower rank
  - Moderators can permanently system ban any player only after they have been temp. banned 3 or more times.
  
-User Room Moderation 
+#User Room Moderation
+## Testing
+
+__Test**ing**__
  - Game Room leaders and/or room owner can temporarily kick any player from the room
 	- Owner of the room cannot be kicked by the leader 
 	- Owner can kick the leader of the room 
