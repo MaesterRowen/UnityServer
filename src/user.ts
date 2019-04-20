@@ -1,8 +1,13 @@
 
 import { Database } from './database';
-import { Constants, Util } from './shared';
+import { Constants, Util, HashMap } from './shared';
 import { MysqlError, PoolConnection } from 'mysql'
 import { LocalCache, IGameInfo } from './inmemory-db/local-cache';
+
+export interface IRelationhip {
+    UserId: number;
+    Type: string;
+}
 
 export class User {
 
@@ -13,7 +18,7 @@ export class User {
     private mFlags: number = 0;
     private mLocation: number = 0;
     private mLevel: number = 0;
-    private mRelationships: any = [];
+    private mRelationships: HashMap<number, IRelationhip> = new HashMap();
     private mActiveTitleID: number = 0;
     private mActiveTUVersion: number = 0;
 
@@ -26,8 +31,6 @@ export class User {
         this.mId = 0;
         this.mUsername = "";
         this.mAuthenticated = false;
-
-        Util.Log('user created');
     }
 
     GetId(): number {
@@ -84,22 +87,18 @@ export class User {
                 return;
             }
 
-            Util.Log("got conn");
-
             let sql: string = "SELECT ID FROM users WHERE Username = ? AND APIKey = UNHEX(?) AND Approved = 1";
             conn.query(sql, [username, apiKey], (err: MysqlError, results?: any) => {
                 if (err) {
                     Database.PrintError(err);
                     callbackFn(Constants.ERROR_FAIL, 0);
                 } else if (results.length > 0) {
-                    Util.Log("results found");
                     if (results[0].Banned == 1) {
                         callbackFn(Constants.ERROR_PERM_BANNED, 0);
                     } else {
                         callbackFn(Constants.ERROR_SUCCESS, results[0].ID);
                     }
                 } else {
-                    Util.Log('found none');
                     callbackFn(Constants.ERROR_FAIL, 0);
                 }
 
@@ -194,7 +193,10 @@ export class User {
                         if (results.length > 0) {
                             let relationshipList: any = results[1];
                             for (let x: number = 0; x < relationshipList.length; x++) {
-                                this.mRelationships[relationshipList[x].TargetID] = relationshipList[x].RelationType;
+                                this.mRelationships.set(relationshipList[x].TargetID, {
+                                    "UserId": relationshipList[x].TargetID,
+                                    "Type": relationshipList[x].RelationType
+                                });
                             }
                         }
 

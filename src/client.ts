@@ -31,10 +31,6 @@ export class Client {
     private encryptedClient: boolean = false;
     private commandMap: ICommand[] = [];
 
-    toString(): string {
-        return "Hi There";
-    }
-
     static CreateClient(socket: net.Socket) {
         return new Client(socket);
     }
@@ -43,7 +39,6 @@ export class Client {
         this.socket = socket;
         this.recvBuffer = Buffer.alloc(0, 0);
 
-        console.log('client constructed: ' + Client.Connections.count());
 
         // Initialize Crypto
         this.clientCrypto = new Crypt();
@@ -91,8 +86,6 @@ export class Client {
     }
 
     HandleConnection(incomingData: Buffer): void {
-
-        console.log('handle connection: ' + Client.Connections.count());
 
         // Add this data into onto our receiving buffer
         this.recvBuffer = Buffer.concat([this.recvBuffer, incomingData]);
@@ -326,7 +319,6 @@ export class Client {
                 } else {
 
                     // Transmit our error message
-                    Util.Log('error?');
                     context.xmitErrorMsg(c.GetCommandId(), msguid, status);
                 }
             });
