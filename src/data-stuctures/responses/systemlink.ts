@@ -75,7 +75,7 @@ export class DTRTUVersions extends Struct {
 
     AddTitleUpdate(tuItem: ITitleUpdate): void {
 
-        Util.PrintObject(tuItem);
+        //Util.PrintObject(tuItem);
 
         // Generate a temporary struct for this room
         let tuObj: Struct = new Struct();

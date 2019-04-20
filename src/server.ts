@@ -44,39 +44,26 @@ export class Server {
         });
     }
 
-    Initialize(): Observable<void> {
-        return Observable.create((observer: Observer<void>) => {
-
-            // Load all of the data from remote database into our Local Cache
-            LocalCache.LoadLobbyList(0).subscribe(null, err => {
-                observer.error(Constants.ERROR_FAIL);
-            }, () => {
-                LocalCache.LoadTitleUpdates(0x1).subscribe(null, err => {
-                    observer.error(Constants.ERROR_FAIL);
-                }, () => {
-                    LocalCache.LoadGameList(0x1).subscribe(null, err => {
-                        observer.error(Constants.ERROR_FAIL);
-                    }, () => {
-                        observer.next();
-                        observer.complete();
-                    });
-                });
-            });
-        });
+    async Initialize(): Promise<void> {
+        try {
+            await LocalCache.LoadLobbyList();
+            await LocalCache.LoadTitleUpdates(0x1);
+            await LocalCache.LoadGameList();
+        } catch (err) {
+            return err;
+        }
     }
 
     StartLink(port: number): void {
 
+
         // Output some debug inforamtion
         Util.Log("LiNK Server v0.2 Alpha");
         Util.Log("Copywrite Phoenix 2019");
-
         // Load LiNK configuration
         //LoadConfigFile('config.json');
 
-        this.Initialize().subscribe(null, (err: number) => {
-            Util.Log("An error occrred initializing server data.  [ERR: " + err + "]");
-        }, () => {
+        this.Initialize().then(() => {
             // Start listening for connections
             Util.Log("Listening on port: " + port);
             Util.Log("Connections: 0");
@@ -84,6 +71,8 @@ export class Server {
 
             // Start listening
             this.server.listen(port, function () { });
+        }, (err) => {
+            Util.Log("An error occurred initializing server data. [ERR: " + err + "]");
         });
     }
 }

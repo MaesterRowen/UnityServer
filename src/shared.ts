@@ -1,7 +1,7 @@
 // Export all shared modules
-import * as net from 'net';
-import * as crypto from 'crypto';
-import * as mysql from 'mysql';
+import net from 'net';
+import crypto from 'crypto';
+import mysql from 'mysql';
 import HashMap from 'hashmap';
 
 export { Crypt } from './crypt';

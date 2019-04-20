@@ -11,6 +11,7 @@ import { Database } from './database';
 import { DTRLobbyList, DTRTUVersions, DTRGameInfo } from './data-stuctures/responses/systemlink';
 import { DTQGetTUVersions, DTQUpdateGame, DTQGetRooms } from './data-stuctures/commands/systemlink';
 import { ITitleUpdate, IGameInfo, LocalCache } from './inmemory-db/local-cache';
+import HashMap from 'hashmap';
 
 interface ICommand {
     enc: boolean;
@@ -19,7 +20,8 @@ interface ICommand {
 }
 
 export class Client {
-
+    //public static Connections: Client[] = [];
+    public static Connections: HashMap<number, Client> = new HashMap();
     private recvBuffer: Buffer = null;
     private receivingPacketPayload: boolean = false;
     private packetBytesReceived: number = 0;
@@ -27,10 +29,11 @@ export class Client {
     private user: User = null;
     private clientCrypto: Crypt = null;
     private encryptedClient: boolean = false;
-
-    public static Connections: Client[] = [];
-
     private commandMap: ICommand[] = [];
+
+    toString(): string {
+        return "Hi There";
+    }
 
     static CreateClient(socket: net.Socket) {
         return new Client(socket);
@@ -39,6 +42,8 @@ export class Client {
     private constructor(socket: net.Socket) {
         this.socket = socket;
         this.recvBuffer = Buffer.alloc(0, 0);
+
+        console.log('client constructed: ' + Client.Connections.count());
 
         // Initialize Crypto
         this.clientCrypto = new Crypt();
@@ -79,13 +84,15 @@ export class Client {
 
     HandleDisconnect(): void {
         // Remove connection from connection array
-        if (Client.Connections[500] != null) {
-            Util.Log('removing connection');
-            delete Client.Connections[500];
-        }
+        //if (Client.Connections[500] != null) {
+        //    Util.Log('removing connection');
+        //    delete Client.Connections[500];
+        /// }
     }
 
     HandleConnection(incomingData: Buffer): void {
+
+        console.log('handle connection: ' + Client.Connections.count());
 
         // Add this data into onto our receiving buffer
         this.recvBuffer = Buffer.concat([this.recvBuffer, incomingData]);
@@ -297,7 +304,7 @@ export class Client {
         // First, let's verify if the user is already connected, and if so, disconnect them
         context.user.ValidateUser(c.Get("Username"), c.Get("APIKey"), (status: number, id: number) => {
             // If our user was valid, check and currently connected, then disconnect them
-            if (status == Constants.ERROR_SUCCESS && Client.Connections[id]) {
+            if (status == Constants.ERROR_SUCCESS && Client.Connections.has(id)) {
                 Util.Log("User '" + id + "' is currently connected.  Sending disconnect.");
                 // TODO:  Client.Connections[id].SendDisconnect();
             }
@@ -306,7 +313,8 @@ export class Client {
             context.user.Authenticate(c.Get("Username"), c.Get("APIKey"), c.Get("GamerTag"), c.Get("Flags"), (status: number) => {
                 if (status == Constants.ERROR_SUCCESS) {
                     // Authentication successful, so add client to list
-                    Client.Connections[context.user.GetId()] = context;
+                    Client.Connections.set(context.user.GetId(), context);
+
 
                     // Create our authorization response
                     let xmit: DTRAuthStatus = new DTRAuthStatus();
@@ -333,7 +341,7 @@ export class Client {
             let xmit: DTRLobbyList = new DTRLobbyList();
             if (status == Constants.ERROR_SUCCESS && data != null) {
                 for (let x: number = 0; x < data.length; x++) {
-                    Util.PrintObject(data[x]);
+                    //Util.PrintObject(data[x]);
                     xmit.AddRoom(data[x]);
                 }
                 // Update room count

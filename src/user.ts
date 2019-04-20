@@ -49,13 +49,9 @@ export class User {
 
     UpdateGame(titleId: number, tuVersion: number, callbackFn: (status: number, game?: IGameInfo) => void): void {
 
-        // First, verify that the game exists 
         let gameItem: IGameInfo = null;
-        for (let gameIdx: number = 0; gameIdx < LocalCache.GameList.length; gameIdx++) {
-            if (LocalCache.GameList[gameIdx].TitleId == titleId) {
-                gameItem = LocalCache.GameList[gameIdx];
-                break;
-            }
+        if (LocalCache.GameMap.has(titleId) == true) {
+            gameItem = LocalCache.GameMap.get(titleId);
         }
 
         // If the game was not found, then we return our error

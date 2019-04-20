@@ -1,6 +1,6 @@
 import { Server } from './server';
 import { Constants } from './constants';
-import { WebServer } from './www/portal';
+import { WebServer } from './admin';
 
 let web: WebServer = new WebServer();
 web.StartServer();

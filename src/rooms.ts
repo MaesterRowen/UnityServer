@@ -43,31 +43,13 @@ export class Rooms {
     static GetLobbyList(flags: number, callbackFn: (status: number, data?: ILobbyInfo[]) => void): void {
 
         // Return successfull
-        callbackFn(Constants.ERROR_SUCCESS, LocalCache.LobbyList);
+        callbackFn(Constants.ERROR_SUCCESS, LocalCache.LobbyMap.values());
     }
 
     static GetTUVersions(titleId: number): ITitleUpdate[] {
-        let tuVersions: ITitleUpdate[] = [];
-
-        for (let gameIdx: number = 0; gameIdx < LocalCache.GameList.length; gameIdx++) {
-            // Determine if we havea matching game
-            let gameItem: IGameInfo = LocalCache.GameList[gameIdx];
-            if (gameItem.TitleId != titleId) continue;
-
-            // Loop through each TU and detemrine if base version matches
-            for (let tuIdx: number = 0; tuIdx < gameItem.TUVersions.length; tuIdx++) {
-                let tuItem: ITitleUpdate = gameItem.TUVersions[tuIdx];
-                //if (tuItem.BaseVersion != baseVersion) continue;
-
-                // Finally, add this TU to our list
-                tuVersions.push(tuItem);
-            }
-        }
-
-        // Return the completed list
-        return tuVersions;
+        // Return an array of title updates for the requested title ID
+        return (LocalCache.GameMap.has(titleId) ? LocalCache.GameMap.get(titleId).TUVersions : []);
     }
-
 }
 
 

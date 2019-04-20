@@ -1,6 +1,4 @@
 import { Crypt } from './shared';
-import * as fs from 'fs';
-import * as util from 'util';
 
 export class Util {
 
@@ -29,7 +27,7 @@ export class Util {
     }
 
     static PrintObject(object: any): void {
-        Util.Log(JSON.stringify(object, null, 2));
+        console.log(JSON.stringify(object, null, 2));
     }
 
     static ParseMACAddressBuffer(macBuffer: Buffer): string {

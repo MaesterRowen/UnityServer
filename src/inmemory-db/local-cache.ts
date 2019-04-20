@@ -1,9 +1,10 @@
 import { Database } from '../database';
-import { Constants, Util, HashMap } from '../shared';
+import { Constants, Util, HashMap, mysql } from '../shared';
 import { MysqlError, PoolConnection } from 'mysql'
 import { Observable, Observer, forkJoin } from 'rxjs';
 import { connect } from 'tls';
 import { isDeepStrictEqual } from 'util';
+import { resolve } from 'url';
 
 export interface ILinkRoom {
     Id: number;                // The ID of the room
@@ -63,196 +64,181 @@ export interface IGameInfo {
 
 export class LocalCache {
 
+    static LobbyMap: HashMap<number, ILobbyInfo> = new HashMap();
     static GameMap: HashMap<number, IGameInfo> = new HashMap();
-
-    static LobbyList: ILobbyInfo[] = [];
-    static GameList: IGameInfo[] = [];
-    static TUList: ITitleUpdate[] = [];
+    static TUMap: HashMap<number, ITitleUpdate> = new HashMap();
     static RoomList: IGameRoom[] = [];
 
-    static LoadLobbyList(flags: number): Observable<void> {
-        return Observable.create((observer: Observer<void>) => {
+    static LoadLobbyList(flags: number = 0x00): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
             Database.Pool.getConnection((err: MysqlError, conn: PoolConnection) => {
                 if (err) {
                     Database.PrintError(err);
-                    observer.error(Constants.ERROR_FAIL);
-                    return;
+                    reject(Constants.ERROR_FAIL);
                 } else {
-                    let sql: string = "SELECT RoomID, RoomName, TitleID, Flags, (SELECT Count(ID) FROM users AS U WHERE U.TitleID = R.TitleID AND Online = 1 AND NOT LocationID = 1) AS UserCount FROM linkrooms AS R WHERE R.ParentID = 1 AND R.GAmeRoom = 0 ORDER BY UserCount DESC, RoomName ASC";
+                    let sql: string = "SELECT RoomID, RoomName, TitleID, Flags, (SELECT Count(ID) FROM users AS U WHERE U.TitleID = R.TitleID AND Online = 1 AND NOT LocationID = 1) AS UserCount FROM linkrooms AS R WHERE R.ParentID = 1 AND R.GameRoom = 0 ORDER BY UserCount DESC, RoomName ASC";
                     conn.query(sql, (err: MysqlError, results?: any) => {
                         if (err) {
                             Database.PrintError(err);
-                            observer.error(Constants.ERROR_FAIL);
-                            conn.release();
-                            return;
-                        }
-                        else if (results.length > 0) {
+                            reject(Constants.ERROR_FAIL);
+                        } else {
+                            // Clear out our lobby map
+                            LocalCache.LobbyMap.clear();
 
-
-                            // Clear existing lobby list
-                            LocalCache.LobbyList = [];
-
-                            // Loop through each room and generate our ILobbyInfo
-                            for (let x: number = 0; x < results.length; x++) {
-                                LocalCache.LobbyList.push({
-                                    "Id": results[x].RoomID,
-                                    "Name": results[x].RoomName,
-                                    "TitleId": results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID,
-                                    "Flags": results[x].Flags | Constants.ROOM_PERSISTANT,
-                                    "UserCount": results[x].UserCount
-                                });
+                            // If we received results, then fill in our mpa
+                            if (results.length > 0) {
+                                // Loop through each room and generate our ILobbyInfo
+                                for (let x: number = 0; x < results.length; x++) {
+                                    LocalCache.LobbyMap.set(results[x].RoomID, {
+                                        "Id": results[x].RoomID,
+                                        "Name": results[x].RoomName,
+                                        "TitleId": results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID,
+                                        "Flags": results[x].Flags | Constants.ROOM_PERSISTANT,
+                                        "UserCount": results[x].UserCount
+                                    });
+                                }
                             }
+                            Util.Log("Cached " + LocalCache.LobbyMap.count() + " LiNK Lobbies.");
 
-                            Util.Log("Cached " + LocalCache.LobbyList.length + " LiNK Lobbies.");
-                            observer.next();
+                            // Successful
+                            resolve();
                         }
-
-                        // We're complete
-                        observer.complete();
                     });
+
+                    // Release connection
+                    conn.release();
                 }
-                // Release the connection
-                conn.release();
             });
         });
     }
 
-    static LoadGameList(flags: number): Observable<void> {
-        return Observable.create((observer: Observer<void>) => {
+    static LoadGameList(flags: number = 0x01): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
             // Grab a connection from our connection pool
             Database.Pool.getConnection((err: MysqlError, conn: PoolConnection) => {
                 if (err) {
                     Database.PrintError(err);
-                    observer.error(Constants.ERROR_FAIL);
-                    return;
+                    reject(Constants.ERROR_FAIL);
                 } else {
                     let sql: string = "SELECT TitleID, Name, TitleType, LinkEnabled FROM titles";
                     conn.query(sql, (err: MysqlError, results?: any) => {
+
                         if (err) {
                             Database.PrintError(err);
-                            observer.error(Constants.ERROR_FAIL);
-                            return;
-                        }
-                        else if (results.length > 0) {
+                            reject(Constants.ERROR_FAIL);
+                        } else {
                             // Clear existing lobby list
-                            LocalCache.GameList = [];
+                            LocalCache.GameMap.clear();
 
-                            let tuCount: number = 0;
+                            if (results.length > 0) {
 
-                            // Loop through each room and generate our ILobbyInfo
-                            for (let x: number = 0; x < results.length; x++) {
+                                let tuCount: number = 0;
 
-                                if (flags & 0x1 && results[x].LinkEnabled == 0) continue;
+                                // Loop through each room and generate our ILobbyInfo
+                                for (let x: number = 0; x < results.length; x++) {
 
-                                // Parse title type
-                                let type: MTitleType = MTitleType.Unknown;
-                                switch (results[x].TitleType as string) {
-                                    case '360': type = MTitleType.Xbox360; break;
-                                    case 'XBLA': type = MTitleType.XBLA; break;
-                                    case 'XNA': type = MTitleType.XNA; break;
-                                    case 'Xbox1': type = MTitleType.XboxClassic; break;
-                                    case 'Homebrew': type = MTitleType.Homebrew; break;
-                                };
+                                    if (flags & 0x1 && results[x].LinkEnabled == 0) continue;
 
-                                let titleId: number = results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID;
+                                    // Parse title type
+                                    let type: MTitleType = MTitleType.Unknown;
+                                    switch (results[x].TitleType as string) {
+                                        case '360': type = MTitleType.Xbox360; break;
+                                        case 'XBLA': type = MTitleType.XBLA; break;
+                                        case 'XNA': type = MTitleType.XNA; break;
+                                        case 'Xbox1': type = MTitleType.XboxClassic; break;
+                                        case 'Homebrew': type = MTitleType.Homebrew; break;
+                                    };
 
-                                let tuVersions: ITitleUpdate[] = [];
-                                // Loop through each title update and check if the titleid matches... if it does, then add it to our outgoing list
-                                for (let x: number = 0; x < LocalCache.TUList.length; x++) {
-                                    if (LocalCache.TUList[x].TitleId != titleId) continue;
-                                    tuVersions.push(LocalCache.TUList[x]);
+                                    let titleId: number = results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID;
+
+                                    let tuVersions: ITitleUpdate[] = [];
+                                    // Loop through each title update and check if the titleid matches... if it does, then add it to our outgoing list
+                                    LocalCache.TUMap.forEach((value: ITitleUpdate, key: number) => {
+                                        if (value.TitleId == titleId) {
+                                            tuVersions.push(value);
+                                        }
+                                    });
+                                    tuCount += tuVersions.length;
+
+                                    // Push this item into our map
+                                    LocalCache.GameMap.set(titleId, {
+                                        "Name": results[x].Name,
+                                        "TitleId": titleId,
+                                        "LinkEnabled": results[x].LinkEnabled == 1 ? true : false,
+                                        "Type": type,
+                                        "TUVersions": tuVersions
+                                    });
                                 }
 
-                                tuCount += tuVersions.length;
-
-                                LocalCache.GameList.push({
-                                    "Name": results[x].Name,
-                                    "TitleId": titleId,
-                                    "LinkEnabled": results[x].LinkEnabled == 1 ? true : false,
-                                    "Type": type,
-                                    "TUVersions": tuVersions
-                                });
-
-                                // Push this item into our map
-                                LocalCache.GameMap.set(titleId, {
-                                    "Name": results[x].Name,
-                                    "TitleId": titleId,
-                                    "LinkEnabled": results[x].LinkEnabled == 1 ? true : false,
-                                    "Type": type,
-                                    "TUVersions": tuVersions
-                                });
+                                Util.Log("Cached " + LocalCache.GameMap.count() + " game titles and " + tuCount + " title updates versions");
                             }
-
-                            Util.Log("Cached " + LocalCache.GameMap.count() + " game titles and " + tuCount + " title updates versions");
-                            observer.next();
+                            resolve();
                         }
-
-                        // We're complete
-                        observer.complete();
-
                     });
-                }
 
-                // Release the connection
-                conn.release();
+                    // Release connection
+                    conn.release();
+                }
             });
         });
     }
 
-    static LoadTitleUpdates(flags: number): Observable<void> {
-        return Observable.create((observer: Observer<void>) => {
+    static LoadTitleUpdates(flags: number = 0x00): Promise<void> {
+        return new Promise<void>((resolve, reject) => {
             // Grab a connection from our connection pool
             Database.Pool.getConnection((err: MysqlError, conn: PoolConnection) => {
                 if (err) {
                     Database.PrintError(err);
-                    observer.error(Constants.ERROR_FAIL);
-                    return;
+                    reject(Constants.ERROR_FAIL);
                 } else {
                     let sql: string = "SELECT TitleUpdateID, TitleID, MediaID, CAST(Region as INT) AS Region, CAST(version as INT) AS Version, baseVersion FROM titleupdates GROUP BY TitleID, version ORDER BY TitleID ASC, version DESC";
                     conn.query(sql, (err: MysqlError, results?: any) => {
                         if (err) {
                             Database.PrintError(err);
-                            observer.error(Constants.ERROR_FAIL);
-                            return;
+                            reject(Constants.ERROR_FAIL);
                         }
-                        else if (results.length > 0) {
-                            LocalCache.TUList = [];
+                        else {
+                            // Clear TitleUdpateMap
+                            LocalCache.TUMap.clear();
 
-                            // Loop through each room and generate our ILobbyInfo
-                            for (let x: number = 0; x < results.length; x++) {
-                                LocalCache.TUList.push({
-                                    "Id": results[x].Id,
-                                    "TitleId": results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID,
-                                    "MediaId": results[x].MediaID instanceof Buffer ? results[x].MediaID.readUInt32BE(0) : results[x].MediaID,
-                                    "Region": results[x].Region,
-                                    "Version": results[x].Version,
-                                    "BaseVersion": results[x].baseVersion instanceof Buffer ? results[x].baseVersion.readUInt32BE(0) : results[x].baseVersion,
-                                });
+                            if (results.length > 0) {
+
+                                // Loop through each room and generate our ILobbyInfo
+                                for (let x: number = 0; x < results.length; x++) {
+                                    LocalCache.TUMap.set(results[x].TitleUpdateID, {
+                                        "Id": results[x].TitleUpdateID,
+                                        "TitleId": results[x].TitleID instanceof Buffer ? results[x].TitleID.readUInt32BE(0) : results[x].TitleID,
+                                        "MediaId": results[x].MediaID instanceof Buffer ? results[x].MediaID.readUInt32BE(0) : results[x].MediaID,
+                                        "Region": results[x].Region,
+                                        "Version": results[x].Version,
+                                        "BaseVersion": results[x].baseVersion instanceof Buffer ? results[x].baseVersion.readUInt32BE(0) : results[x].baseVersion,
+                                    });
+                                }
+
+                                Util.Log("Cached " + LocalCache.TUMap.count() + " title update versions");
                             }
 
-                            Util.Log("Cached " + LocalCache.TUList.length + " title update versions");
-                            observer.next();
+                            resolve();
                         }
-
-                        // We're complete
-                        observer.complete();
                     });
-                }
 
-                // Release the connection
-                conn.release();
+                    // Release connection
+                    conn.release();
+                }
             });
         });
     }
 
     static GetGameLobby(titleId: number): ILobbyInfo {
+        let retval: ILobbyInfo = null;
+        LocalCache.LobbyMap.forEach((value: ILobbyInfo, key: number) => {
+            if (value.TitleId == titleId) {
+                retval = value;
+                return;
+            }
+        });
 
-        for (let x: number = 0; x < LocalCache.LobbyList.length; x++) {
-            let lobby: ILobbyInfo = LocalCache.LobbyList[x];
-            if (lobby.TitleId == titleId) return lobby;
-        }
-
-        return null;
+        return retval;
     }
 
     static GetNewestTID(game: IGameInfo, baseVersion: number): ITitleUpdate {
