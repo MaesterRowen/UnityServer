@@ -399,6 +399,8 @@ export class Client {
         // Get the Game Lobby
         let user: User = context.user;
         let lobbyItem: ILobbyInfo = LocalCache.GetGameLobby(user.GetTitleId());
+
+
     }
 }
 

@@ -1,4 +1,4 @@
-import * as crypto from "crypto";
+import crypto from "crypto";
 import { Util } from './shared';
 
 export class Crypt {
@@ -6,7 +6,6 @@ export class Crypt {
     private keyObj: crypto.DiffieHellman = undefined;
 
     private secretKey: Buffer = undefined;
-    private AES: Buffer = undefined;
     private aesCipher: crypto.CipherKey = undefined;
     private encryptionReady: boolean = false;
 
@@ -37,13 +36,11 @@ export class Crypt {
         // Extract sha1 hash
         let hash: Buffer = hmac.digest();
 
-        Util.Log("hash len: " + hash.length);
-
         // Use the first 16 bytes of the sha1 hash as the AES cipher
         this.aesCipher = Buffer.alloc(0x10, hash);
 
-        Util.Log("aes-cipher: " + this.aesCipher.toString('hex'));
-        Util.Log("aes-cipher len: " + this.aesCipher.length);
+        //Util.Log("aes-cipher: " + this.aesCipher.toString('hex'));
+        //Util.Log("aes-cipher len: " + this.aesCipher.length);
 
         // Ready for encryption
         this.encryptionReady = true;
@@ -83,8 +80,6 @@ export class Crypt {
     }
 
     AESDecrypt(input: Buffer, iv: Buffer): Buffer {
-
-        Util.Log("decrypt key: " + this.aesCipher.toString('hex'));
 
         // Define the encryption algorithm
         let algorithm: string = "aes-128-cbc";

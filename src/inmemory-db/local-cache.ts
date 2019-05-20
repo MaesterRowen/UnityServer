@@ -172,6 +172,7 @@ export class LocalCache {
 
                                 Util.Log("Cached " + LocalCache.GameMap.count() + " game titles and " + tuCount + " title updates versions");
                             }
+
                             resolve();
                         }
                     });

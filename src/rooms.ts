@@ -1,8 +1,38 @@
 import { Database } from './database';
-import { Constants, Util, User } from './shared';
+import { Constants, Util, User, HashMap } from './shared';
 import { LocalCache, ITitleUpdate, IGameInfo, IGameRoom } from './inmemory-db/local-cache';
 import { MysqlError, PoolConnection } from 'mysql'
 import { Client } from './client';
+
+
+export class LinkRoom {
+    public Id: number;
+    public Name: string;
+    public TitleId: number;
+    public Flags: number;
+
+
+    public Children: HashMap<number, LinkRoom> = new HashMap();
+
+    constructor() {
+
+    }
+
+    GetChildCount(): number {
+        return this.Children.count();
+    }
+    GetUserCount(): number {
+        if (this.Flags & Constants.ROOM_GAMEROOM) {
+            return
+        }
+        let userCount: number = 0;
+        this.Children.forEach((value: LinkRoom, key: number) => {
+            userCount += value.GetUserCount();
+        });
+        return userCount;
+    }
+}
+
 
 export interface ILobbyInfo {
     Id: number;
@@ -21,6 +51,24 @@ export interface ICurrentRoom {
 }
 
 export class Rooms {
+
+    private static MainLobby: LinkRoom = new LinkRoom();
+
+    static GetMainLobby(): LinkRoom {
+        return Rooms.MainLobby;
+    }
+
+    static GetGameLobby(titleId: number): LinkRoom {
+        // Find the game lobby with matching title id
+        let retval: LinkRoom = null;
+        Rooms.MainLobby.Children.forEach((value: LinkRoom, key: number) => {
+            if (value.TitleId == titleId) {
+                retval = value;
+            }
+        });
+
+        return retval;
+    }
 
     static GetLobbyUserCount(lobbyId: number): number {
 
